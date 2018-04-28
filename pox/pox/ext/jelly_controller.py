@@ -18,17 +18,6 @@ class FellyjishController(object):
         self.mac_to_port = {}
 
 
-    def resend_packet(self, packet_in, out_port):
-
-        msg = of.ofp_packet_out()
-        msg.data = packet_in
-
-        action = of.ofp_action_output(port = out_port)
-        msg.actions.append(action)
-
-        self.connection.send(msg)
-
-
     def act_like_switch (self, packet, packet_in):
 
         log.info("Installing flow... src: " + str(packet.src) + " dst: " + str(packet.dst) + " port: " + str(packet_in.in_port))
