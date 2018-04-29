@@ -81,7 +81,7 @@ class JellyFishTop(Topo):
             for s2 in links[s1]:
                 link_pairs.add((s1, s2) if s1 < s2 else (s2, s1))
 
-        # for now, remove cycles in graph
+        # XXX: for now, remove cycles in graph
         link_pairs.remove((1, 5))
         link_pairs.remove((2, 5))
 
