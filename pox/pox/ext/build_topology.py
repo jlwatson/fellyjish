@@ -23,7 +23,6 @@ from pox.ext.jelly_pox import JELLYPOX
 
 class JellyFishTop(Topo):
 
-
     def build(self, nServers, nSwitches, nPorts):
 
         if nPorts < 2:
@@ -36,7 +35,7 @@ class JellyFishTop(Topo):
 
         hosts = []
         for s in range(nServers):
-            hosts.append(self.addHost('h'+str(s)))
+            hosts.append(self.addHost('h'+str(s), mac='00:00:00:00:00:0'+str(s)))
 
         switches = []
         openPorts = [nPorts] * nSwitches 
@@ -81,7 +80,10 @@ class JellyFishTop(Topo):
         for s1 in links:
             for s2 in links[s1]:
                 link_pairs.add((s1, s2) if s1 < s2 else (s2, s1))
-        print(link_pairs)
+
+        # for now, remove cycles in graph
+        link_pairs.remove((1, 5))
+        link_pairs.remove((2, 5))
 
         for p in link_pairs:
             self.addLink(switches[p[0]], switches[p[1]])
@@ -91,7 +93,7 @@ def experiment(net):
     net.start()
     dumpNetConnections(net)
     sleep(3)
-    net.pingAll()
+    net.ping(net.hosts[:2])
     net.stop()
 
 
