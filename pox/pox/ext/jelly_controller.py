@@ -6,13 +6,16 @@ from pox.core import core
 import pox.openflow.libopenflow_01 as of
 import logging
 
+from mininet.topo import Topo
+
 log = core.getLogger()
 log.setLevel(logging.DEBUG)
 
-'''
-def handle_link_event(event):
-    log.debug("Link event: dpid1,2: %s,%s port1,2: %s, %s" % (event.dpid1, event.dpid2, event.port1, event.port2))
-'''
+import os
+import pickle
+
+TOPO_FILE = "pox/ext/topo.pickle"
+
 
 class FellyjishController(object):
 
@@ -23,7 +26,10 @@ class FellyjishController(object):
         self.connection.addListeners(self)
 
         self.mapping = {}
-        # switch_map[self.dpid] = self
+
+        with open(TOPO_FILE, 'rb') as f:
+            self.topo = pickle.load(f)
+
 
     def act_like_switch(self, packet, packet_in):
 
@@ -67,13 +73,9 @@ class FellyjishController(object):
           return
 
         log.debug("Packet with unknown output port received")
+        log.debug(self.topo)
         self.act_like_switch(packet, event.ofp)
 
-    '''
-    def _handle_LinkEvent(self, event):
-        log.debug("Link event: dpid1,2: %s,%s port1,2: %s, %s" % (event.dpid1, event.dpid2, event.port1, event.port2))
-        log.debug("own dpid: %s" % self.dpid)
-    '''
 
 def launch():
 

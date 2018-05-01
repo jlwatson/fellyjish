@@ -1,11 +1,10 @@
 import argparse
 import os
+import pickle
 import random
-import sys
 
 from collections import defaultdict
 from subprocess import Popen
-from time import sleep, time
 
 from mininet.net import Mininet
 from mininet.topo import Topo
@@ -16,9 +15,6 @@ from mininet.node import CPULimitedHost
 from mininet.link import TCLink
 from mininet.cli import CLI
 from mininet.util import dumpNetConnections
-
-sys.path.append("../../")
-from pox.ext.jelly_pox import JELLYPOX
 
 
 class JellyFishTop(Topo):
@@ -89,29 +85,17 @@ class JellyFishTop(Topo):
             self.addLink(switches[p[0]], switches[p[1]])
 
 
-def experiment(net):
-    net.start()
-    dumpNetConnections(net)
-    sleep(3)
-    net.ping(net.hosts[:2])
-    net.stop()
+if __name__ == "__main__":
 
-
-def main(debug):
-
-    if debug:
+    parser = argparse.ArgumentParser(description="Build fellyjish topology.")
+    parser.add_argument('--debug', help='run in debug mode (same random seed)', action='store_true')
+    parser.add_argument('--pickle', help='Topo pickle file path', default='topo.pickle')
+    args = parser.parse_args()
+    
+    if args.debug:
         random.seed(0xbeef)
 
     topo = JellyFishTop(nServers=3, nSwitches=6, nPorts=3)
-    net = Mininet(topo=topo, host=CPULimitedHost, link = TCLink, controller=JELLYPOX)
-    experiment(net)
-
-
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description="Run fellyjish experiment.")
-    parser.add_argument('--debug', help='run in debug mode (same random seed)', action='store_true')
-    args = parser.parse_args()
-
-    main(args.debug)
+    with open(args.pickle, 'wb') as f:
+        pickle.dump(topo, f)
 
