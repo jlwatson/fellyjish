@@ -45,30 +45,48 @@ class JellyFishTop(Topo):
                 self.addLink(hosts[sw], currSwitch)
                 openPorts[sw] -= 1
             switches.append(currSwitch)
-
         # randomly link the remaining open ports
         links = defaultdict(list)
         while sum(openPorts) > 1:
             openSwitches = [x for x in range(nSwitches) if openPorts[x] > 0]
-
+            # print openSwitches
             if len(openSwitches) == 1: # special case with two ports remaining on same switch
                 curr = openSwitches[0]
-                otherSwitches = [s for s in range(nSwitches) if s != curr]
-                x = random.choice(otherSwitches)
-                y = random.choice(links[x])
+                if curr >= 2:
+                    otherSwitches = [s for s in range(nSwitches) if s != curr]
+                    x = random.choice(otherSwitches)
+                    y = random.choice(links[x])
+                    print 'HITME~~!~!~!~'
+                    links[x].remove(y)
+                    links[y].remove(x)
+                    links[curr].append(x)
+                    links[curr].append(y)
+                    links[x].append(curr)
+                    links[y].append(curr)
+                    openPorts[curr] -= 2
+                    continue
 
-                links[x].remove(y)
-                links[y].remove(x)
-                links[curr].append(x)
-                links[curr].append(y)
-                links[x].append(curr)
-                links[y].append(curr)
-                
-                openPorts[curr] -= 2
+            startOver = False
+            while True:
+                x = random.choice(openSwitches)
+                unconnectedSwitches = [s for s in openSwitches if (s not in links[x] and s != x)]
+                if len(unconnectedSwitches) == 0:
+                    noNewLinks = True
+                    for os in openSwitches:
+                        for os2 in openSwitches:
+                            if os != os2:
+                                noNewLinks = noNewLinks and os2 in links[os]
+                    if noNewLinks:
+                        startOver = True
+                        break
+                else:
+                    break
+            
+            if startOver:
+                openPorts = [nPorts - 1] * nSwitches # assume one port only is used for server
+                links = defaultdict(list)
                 continue
 
-            x = random.choice(openSwitches)
-            unconnectedSwitches = [s for s in openSwitches if (s not in links[x] and s != x)]
             y = random.choice(unconnectedSwitches)
             openPorts[x] -= 1
             openPorts[y] -= 1
@@ -82,8 +100,8 @@ class JellyFishTop(Topo):
                 link_pairs.add((s1, s2) if s1 < s2 else (s2, s1))
 
         # XXX: for now, remove cycles in graph
-        link_pairs.remove((1, 5))
-        link_pairs.remove((2, 5))
+        # link_pairs.remove((1, 5))
+        # link_pairs.remove((2, 5))
 
         for p in link_pairs:
             self.addLink(switches[p[0]], switches[p[1]])
@@ -102,7 +120,7 @@ def main(debug):
     if debug:
         random.seed(0xbeef)
 
-    topo = JellyFishTop(nServers=3, nSwitches=6, nPorts=3)
+    topo = JellyFishTop(nServers=50, nSwitches=50, nPorts=5)
     net = Mininet(topo=topo, host=CPULimitedHost, link = TCLink, controller=JELLYPOX)
     experiment(net)
 
