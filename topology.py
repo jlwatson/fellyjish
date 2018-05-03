@@ -30,7 +30,7 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
     if n_switches < n_servers:
         raise ValueError("Number of servers must be greater than or equal to number of hosts (simulated racks)")
 
-    print("Generating fellyjish topology: %d servers, %d switches, %d ports per switch" % (n_servers, n_switches, n_ports))
+    print("Generating Fellyjish topology: %d servers, %d switches, %d ports per switch" % (n_servers, n_switches, n_ports))
 
     hosts = []
     for s in range(n_servers):
