@@ -1,80 +1,74 @@
 import argparse
+import copy
+import networkx as nx
 import os
 import pickle
 import random
+import sys
 
 from collections import defaultdict
 from subprocess import Popen
-
-from mininet.net import Mininet
-from mininet.topo import Topo
-from mininet.node import Controller
-from mininet.node import RemoteController
-from mininet.node import OVSController
-from mininet.node import CPULimitedHost
-from mininet.link import TCLink
-from mininet.cli import CLI
-from mininet.util import dumpNetConnections
 
 
 def generate_topology(n_servers, n_switches, n_ports, debug=False):
 
     if debug:
-        random.seed(0xbeef)
+        random.seed(0xbaef)
 
-    topo = {} # generated result goes here
+    sys.stdout.write("Generating Fellyjish topology: %d servers, %d switches, %d ports per switch..." % (n_servers, n_switches, n_ports))
 
-    if n_ports < 2:
-        raise ValueError("Number of ports per switch must be >= 2")
+    topo = {}
 
-    if n_switches < n_servers:
-        raise ValueError("Number of servers must be greater than or equal to number of hosts (simulated racks)")
+    G = nx.Graph()
+    topo["graph"] = G
+    topo["n_ports"] = n_ports
 
-    print("Generating Fellyjish topology: %d servers, %d switches, %d ports per switch" % (n_servers, n_switches, n_ports))
-
-    hosts = []
+    topo["n_hosts"] = n_servers
     for s in range(n_servers):
-        hosts.append('h'+str(s))
-    topo["hosts"] = hosts
+        G.add_node('h'+str(s)) 
 
-    switches = []
+    topo["n_switches"] = n_switches
     open_ports = [n_ports] * n_switches 
+
     for sw in range(n_switches):
         curr_switch = 's'+str(sw)
-        if sw < n_servers: # match switch and paired host
-            open_ports[sw] -= 1
-        switches.append(curr_switch)
-    topo["switches"] = switches
+        G.add_node(curr_switch)
 
+        i = sw
+        while i < n_servers:
+            G.add_edge('h'+str(i), curr_switch)
+            i += n_switches
+            open_ports[sw] -= 1
+
+    start_open_ports = copy.deepcopy(open_ports)
+    
     # randomly link the remaining open ports
     links = defaultdict(list)
     while sum(open_ports) > 1:
         open_switches = [x for x in range(n_switches) if open_ports[x] > 0]
         if len(open_switches) == 1: # special case with two ports remaining on same switch
             curr = open_switches[0]
-            if curr >= 2:
+            if open_ports[curr] >= 2:
                 other_switches = [s for s in range(n_switches) if s != curr]
-                x = random.choice(other_switches)
-                y = random.choice(links[x])
-                links[x].remove(y)
-                links[y].remove(x)
-                links[curr].append(x)
-                links[curr].append(y)
-                links[x].append(curr)
-                links[y].append(curr)
+                x = 's'+str(random.choice(other_switches))
+                y = random.choice(list(nx.all_neighbors(G, x)))
+                G.remove_edge(x, y)
+                G.add_edge(x, 's'+str(curr))
+                G.add_edge(y, 's'+str(curr))
                 open_ports[curr] -= 2
                 continue
 
         start_over = False
         while True:
             x = random.choice(open_switches)
-            unconnected_switches = [s for s in open_switches if (s not in links[x] and s != x)]
+            x_name = 's'+str(x)
+            unconnected_switches = [s for s in open_switches if ('s'+str(s) not in list(G.neighbors(x_name)) and s != x)]
             if len(unconnected_switches) == 0:
                 no_new_links = True
                 for os in open_switches:
                     for os2 in open_switches:
                         if os != os2:
-                            no_new_links = no_new_links and os2 in links[os]
+                            no_new_links = no_new_links and 's'+str(os2) in list(G.neighbors('s'+str(os)))
                 if no_new_links:
                     start_over = True
                     break
@@ -82,28 +76,21 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
                 break
         
         if start_over:
-            open_ports= [n_ports - 1] * n_switches # assume one port only is used for server
-            links = defaultdict(list)
+            open_ports = copy.deepcopy(start_open_ports)
+            G = nx.create_empty_copy(G)
             continue
 
         y = random.choice(unconnected_switches)
         open_ports[x] -= 1
         open_ports[y] -= 1
-        links[x].append(y)
-        links[y].append(x)
+        G.add_edge('s'+str(x), 's'+str(y))
 
-    topo["link_map"] = links
-
-    # generate link pairs and add to network
-    link_pairs = set()
-    for s1 in links:
-        for s2 in links[s1]:
-            link_pairs.add((s1, s2) if s1 < s2 else (s2, s1))
-    topo["link_pairs"] = link_pairs
-
+    sys.stdout.write(" done\n")
     return topo
 
 
+'''
+# TODO: move somewhere else
 class JellyFishTop(Topo):
 
     def build(self, topo_map):
@@ -120,19 +107,5 @@ class JellyFishTop(Topo):
 
         for p in topo_map["link_pairs"]:
             self.addLink(mn_switches[p[0]], mn_switches[p[1]])
-        
-
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description="Build fellyjish topology.")
-    parser.add_argument('--debug', help='run in debug mode (same random seed)', action='store_true')
-    parser.add_argument('--pickle', help='Topo pickle file path', default=None)
-    args = parser.parse_args()
-    
-    topo_map = generate_topology(n_servers=3, n_switches=6, n_ports=3, debug=args.debug)
-    with open(args.pickle, 'wb') as f:
-        pickle.dump(topo_map, f)
-
-    # TODO: move Mininet stuff somewhere else
-    # topo = JellyFishTop(topo_map=topo_map)
+'''
 
