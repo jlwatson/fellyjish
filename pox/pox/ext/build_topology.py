@@ -15,6 +15,10 @@ from pox.ext.jelly_pox import JELLYPOX
 from subprocess import Popen
 from time import sleep, time
 
+from mininet.util import dumpNodeConnections, dumpNetConnections
+
+import pickle
+
 def generate_topology(n_servers, n_switches, n_ports, debug=False):
     if debug:
         random.seed(0xbeef)
@@ -105,17 +109,41 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
 class JellyFishTop(Topo):
 
     def build(self):
-        topo_map = generate_topology(100, 200, 4, debug=True)
-        print topo_map
+        #topo_map = generate_topology(100, 200, 4, debug=True)
+        #print topo_map
 
-        leftHost = self.addHost( 'h1' )
-        rightHost = self.addHost( 'h2' )
-        leftSwitch = self.addSwitch( 's3' )
-        rightSwitch = self.addSwitch( 's4' )
-        # Add links
-        self.addLink( leftHost, leftSwitch )
-        self.addLink( leftSwitch, rightSwitch )
-        self.addLink( rightSwitch, rightHost )
+        topo = pickle.load(open('small_topo.pickle', 'r'))
+
+        mn_hosts = []
+        for h in range(topo['n_hosts']):
+            mn_hosts.append(self.addHost('h' + str(h+1), mac='00:00:00:00:11:' + str(hex(h + 1))))
+
+        mn_switches = []
+        for s in range(topo['n_switches']):
+            mn_switches.append(self.addSwitch('s' + str(s + 1), mac='00:00:00:00:00:' + str(hex(s + 1))))
+
+        for e in topo['graph'].edges():
+            if e[0][0] == 'h':
+                f1 = mn_hosts[int(e[0][1:])]
+            else:
+                f1 = mn_switches[int(e[0][1:])]
+
+            if e[1][0] == 'h':
+                f2 = mn_hosts[int(e[1][1:])]
+            else:
+                f2 = mn_switches[int(e[1][1:])]
+
+            self.addLink(f1, f2)
+
+
+        # leftHost = self.addHost( 'h1' )
+        # rightHost = self.addHost( 'h2' )
+        # leftSwitch = self.addSwitch( 's3' )
+        # rightSwitch = self.addSwitch( 's4', mac='00:00:00:00:00:04')
+        # # Add links
+        # self.addLink( leftHost, leftSwitch )
+        # self.addLink( leftSwitch, rightSwitch )
+        # self.addLink( rightSwitch, rightHost )
 
         """
         mn_hosts = []
@@ -138,15 +166,17 @@ class JellyFishTop(Topo):
 
 
 def experiment(net):
-        net.start()
-        sleep(3)
-        net.pingAll()
-        net.stop()
+    dumpNetConnections(net)
+    net.start()
+    sleep(3)
+    net.pingAll()
+    net.stop()
 
 def main():
     #topo_map = generate_topology(100, 200, 4, debug=True)
 
     topo = JellyFishTop()
+
     net = Mininet(topo=topo, host=CPULimitedHost, link = TCLink, controller=JELLYPOX)
     experiment(net)
 

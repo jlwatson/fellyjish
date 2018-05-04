@@ -39,6 +39,8 @@ log = core.getLogger()
 
 switches_by_dpid = {}
 
+mac_to_port = {}
+
 class TopoSwitch (object):
   """
   A Tutorial object is created for each switch that connects.
@@ -89,19 +91,29 @@ class TopoSwitch (object):
     # sending it (len(packet_in.data) should be == packet_in.total_len)).
 
 
-  def act_like_switch (self, packet, packet_in):
+  def act_like_switch (self, packet, packet_in, event):
     """
     Implement switch-like behavior.
     """
 
-    """ # DELETE THIS LINE TO START WORKING ON THIS (AND THE ONE BELOW!) #
+    
 
     # Here's some psuedocode to start you off implementing a learning
     # switch.  You'll need to rewrite it as real Python code.
 
     # Learn the port for the source MAC
-    self.mac_to_port ... <add or update entry>
 
+    if event.dpid not in mac_to_port:
+      mac_to_port[event.dpid] = {}
+    mac_to_port[event.dpid][packet.src] = event.port
+
+    this_mac_to_port = mac_to_port[event.dpid]
+    if packet.dst in this_mac_to_port:
+      pass
+    else:
+      pass
+
+    """
     if the port associated with the destination MAC of the packet is known:
       # Send packet out the associated port
       self.resend_packet(packet_in, ...)
@@ -127,14 +139,14 @@ class TopoSwitch (object):
       # This part looks familiar, right?
       self.resend_packet(packet_in, of.OFPP_ALL)
 
-    """ # DELETE THIS LINE TO START WORKING ON THIS #
+    """
 
 
   def _handle_PacketIn (self, event):
     """
     Handles packet in messages from the switch.
     """
-    log.info("event dpid is " + str(event.dpid))
+    log.info("event mac is " + str(event.parsed))
     packet = event.parsed # This is the parsed packet data.
     if not packet.parsed:
       log.warning("Ignoring incomplete packet")
@@ -142,14 +154,20 @@ class TopoSwitch (object):
 
     packet_in = event.ofp # The actual ofp_packet_in message.
 
+    #switch mac is event.dpid
+
     # Comment out the following line and uncomment the one after
     # when starting the exercise.
-    print "Src: " + str(packet.src)
-    print "Dest: " + str(packet.dst)
-    print "Event port: " + str(event.port)
-    self.act_like_hub(packet, packet_in)
+
+    log.info("At switch " + str(hex(event.dpid)) + ". Src mac is " + str(packet.src) + ", dest mac is " + str(packet.dst))
+    log.info("Coming in at port " + str(event.port))
+    log.info("event ip " + str(packet.find('ipv4')))
+    # log.info("Src: " + str(packet.src))
+    # log.info("Dest: " + str(packet.dst))
+    # log.info("Event port: " + str(event.port))
+    #self.act_like_hub(packet, packet_in)
     log.info("packet in")
-    #self.act_like_switch(packet, packet_in)
+    self.act_like_switch(packet, packet_in, event)
 
 
 
@@ -158,12 +176,14 @@ def launch ():
   Starts the component
   """
   def start_switch (event):
-    log.info("Controlling %s" % (event.connection,))
+    #log.info(event.connection[0])
+    log.info("Controlling %s" % (event.connection.dpid,))
     sw = switches_by_dpid.get(event.dpid)
     log.info("doin some goooooood stuff")
     if sw is None:
       # New switch
-      log.info("in the not found case, dpid is " + str(event.dpid))
+      log.info("in the not found case, dpid is " + str(hex(event.dpid)))
+      
       sw = TopoSwitch(event.connection)
       switches_by_dpid[event.dpid] = sw
       #sw.connect(event.connection)
