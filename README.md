@@ -7,9 +7,10 @@ Diveesh Singh and Jean-Luc Watson
 
 #### Figure 9
 
-![Our reproduction of Figure 9](https://imgur.com/a/P1euzuj)
+![Our reproduction of Figure 9](https://imgur.com/oT9jFuo.png)
 
 TODO: describe
+TODO: instructions to run and retrieve results (currently just `python main.py`)
 
 
 #### Mininet Topology
