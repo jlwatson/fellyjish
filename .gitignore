@@ -2,3 +2,4 @@
 *.pickle
 .env/
 *.log
+*.eps
