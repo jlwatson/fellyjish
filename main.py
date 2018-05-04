@@ -61,6 +61,8 @@ def generate_path_counts(topo, algorithm, k, max_paths_on_link):
             if algorithm == 'k-shortest':
                 paths += k_shortest_paths(topo["graph"], switch1, switch2, k)
                 paths += k_shortest_paths(topo["graph"], switch2, switch1, k)
+            elif algorithm == 'ecmp':
+                pass
 
         link_paths = {}
         for (u, v) in topo["graph"].edges():
