@@ -10,10 +10,13 @@ from collections import defaultdict
 from subprocess import Popen
 
 
+RNG_SEED = 0xBAEF
+
+
 def generate_topology(n_servers, n_switches, n_ports, debug=False):
 
     if debug:
-        random.seed(0xbaef)
+        random.seed(RNG_SEED)
 
     sys.stdout.write("Generating Fellyjish topology: %d servers, %d switches, %d ports per switch..." % (n_servers, n_switches, n_ports))
 
@@ -93,7 +96,11 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
 # TODO: move somewhere else
 class JellyFishTop(Topo):
 
-    def build(self, topo_map):
+    def __init__(self, topo_map):
+        self.topo_map = topo_map
+
+    def build(self):
+        topo_map = self.topo_map
         mn_hosts = []
         for h in topo_map["hosts"]:
             mn_hosts.append(self.addHost(h))

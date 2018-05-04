@@ -2,6 +2,8 @@ from topology import generate_topology
 import pprint
 from collections import Counter
 import sys
+import numpy as np
+import pickle
 
 def bfs(start, end, link_map):
     all_paths = {'max': sys.maxint}
@@ -88,28 +90,65 @@ def dfs_paths(graph, start, goal, k):
     return paths, max_len
 
 
-
+#count for k = 8 and k = 64, using this configuration
+#adjust so that multiple hosts can be for one switch, basically map hosts to corresponding switch, then use below algorithm
 if __name__ == '__main__':
-    n_servers = 686
-    n_switches = 686
-    n_ports = 4
-    k = 8
+    n_servers = 138 * 2
+    n_switches = 138 * 2
+    n_ports = 12
+    k = 64
+
 
     topo_map = generate_topology(n_servers=n_servers, n_switches=n_switches, n_ports=n_ports, debug=True)
     link_map = topo_map['link_map']
-    pprint.pprint(topo_map)
+    print len(topo_map['link_pairs'])
+    #pprint.pprint(topo_map)
+    link_path_counts = Counter()
+    n_servers = 686
+    perm = np.random.permutation(np.arange(n_servers))
     
     for start_host in range(n_servers):
-        for end_host in range(n_servers):
-            if start_host == end_host:
-                continue
-            all_paths = {'max': 30}
-            generate_paths(start_host, end_host, link_map, set(), [start_host], all_paths, k)
-            # all_paths = bfs(start_host, end_host, link_map)
+        end_host = perm[start_host]
+
+        #map host to switch
+        start_switch = start_host % n_switches
+        end_switch = end_host % n_switches
+
+        all_paths = {'max': 30}
+        generate_paths(start_switch, end_switch, link_map, set(), [start_switch], all_paths, k)
+        if all_paths['max'] in all_paths:
+            min_length_paths = all_paths[all_paths['max']]
+        else:
+            continue
+
+        distinct = set()
+
+        for path in min_length_paths:
+            for i in range(len(path) - 1):
+                distinct.add((path[i], path[i + 1]))
+                
+                # if path[i] < path[i + 1]:
+                    
+                # else:
+                #     link_path_counts[(path[i + 1], path[i])] += 1
+
+        for link in distinct:
+            link_path_counts[link] += 1
+        print "all neighbors of " + str(start_host) + " are done"
+        print link_path_counts
+
+            
+    with open('link_path_counts.pickle', 'wb') as f:
+        pickle.dump(link_path_counts, f)
+
+
+
+
+        # all_paths = bfs(start_host, end_host, link_map)
             # print all_paths
-            print all_paths['max']
-            print "the shortest path length between " + str(start_host) + " and " + str(end_host) + " with " + str(k) + " paths is " + str(all_paths['max'])
-            print "the paths are " + str(all_paths[all_paths['max']])
+            # print all_paths['max']
+            # print "the shortest path length between " + str(start_host) + " and " + str(end_host) + " with " + str(k) + " paths is " + str(all_paths['max'])
+            # print "the paths are " + str(all_paths[all_paths['max']])
             # paths, path_length = dfs_paths(link_map, start_host, end_host, k)
             
             # print "number of paths between host " + str(start_host) + " and host " + str(end_host) + " is " + str(len(paths))
