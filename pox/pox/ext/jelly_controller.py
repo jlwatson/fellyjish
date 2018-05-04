@@ -36,6 +36,7 @@ from collections import defaultdict
 from pox.openflow.discovery import Discovery
 import pickle
 import time
+import networkx as nx
 
 log = core.getLogger()
 
@@ -43,7 +44,37 @@ switches_by_dpid = {}
 
 mac_to_port = {}
 
-topo = pickle.load(open('small_topo.pickle', 'r'))
+algo = 'ecmp'
+num_paths = 1
+
+topo = pickle.load(open('/home/diveesh/fellyjish/pox/pox/ext/small_topo.pickle', 'r'))
+paths = {}
+
+def k_shortest_paths(G, start, end, k):
+    return list(islice(nx.shortest_simple_paths(G, start, end), k))
+
+
+def ecmp(G, start, end, k):
+    paths = []
+    for p in nx.shortest_simple_paths(G, start, end):
+        if len(paths) < k and (len(paths) == 0 or len(p) == len(paths[0])):
+            paths.append(p)
+        else:
+            break
+
+    return paths
+
+def _get_paths(src, dst):
+  if (src, dst) in paths:
+    return paths[(src, dst)]
+  if algo == 'ecmp':
+    fn = ecmp
+  else:
+    fn = k_shortest_paths
+
+  p_paths = fn(topo['graph'], src, dst, num_paths)
+  paths[(src, dst)] = p_paths
+  return p_paths
 
 class TopoSwitch (object):
   """
@@ -95,7 +126,7 @@ class TopoSwitch (object):
     # sending it (len(packet_in.data) should be == packet_in.total_len)).
 
 
-  def act_like_switch (self, packet, packet_in, event):
+  def act_like_switch (self, packet, packet_in, event, srchost, dsthost):
     """
     Implement switch-like behavior.
     """
@@ -109,10 +140,17 @@ class TopoSwitch (object):
     mac_to_port[event.dpid][packet.src] = event.port
 
     this_mac_to_port = mac_to_port[event.dpid]
+
+    packet_paths = _get_paths(srchost, dsthost)
+    
+    #for now, pick the first path that exists between a pair of endhosts
+    path = packet_paths[0]
+
     if packet.dst in this_mac_to_port:
-      pass
+      # update the routing table to reflect the path this packet needs to take
+
     else:
-      pass
+      self.resend_packet(packet_in, of.OFPP_ALL)
 
     """
     if the port associated with the destination MAC of the packet is known:
@@ -163,14 +201,29 @@ class TopoSwitch (object):
     log.info("At switch " + str(hex(event.dpid)) + ". Src mac is " + str(packet.src) + ", dest mac is " + str(packet.dst))
     log.info("Coming in at port " + str(event.port))
     log.info("event ip " + str(packet.find('ipv4')))
-    log.info("%s" % G.nodes)
+    log.info(topo['graph'].nodes(data='ip'))
+
+    ipv4 = packet.find('ipv4')
+    if ipv4 is not None:
+      log.info('src ip is ' + str(ipv4.srcip))
+      log.info('dst ip is ' + str(ipv4.dstip))
+      srcip = ipv4.srcip
+      dstip = ipv4.dstip
+      hosts = topo['graph'].nodes(data='ip')
+      for host in hosts:
+        if host[1] == srcip:
+          srchost = host[0]
+        if host[1] == dstip:
+          dsthost = host[0]
+      log.info("src host: " + str(srchost) + ", dsthost: " + str(dsthost))
+      self.act_like_switch(packet, packet_in, event, srchost, dsthost)
 
     # log.info("Src: " + str(packet.src))
     # log.info("Dest: " + str(packet.dst))
     # log.info("Event port: " + str(event.port))
     #self.act_like_hub(packet, packet_in)
     # log.info("packet in")
-    self.act_like_switch(packet, packet_in, event)
+    
 
 
 

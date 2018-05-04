@@ -31,7 +31,12 @@ class JellyFishTop(Topo):
 
         self.mn_hosts = []
         for h in range(topo['n_hosts']):
-            self.mn_hosts.append(self.addHost('h' + str(h + 1), ip=topo["graph"].nodes['h'+str(h)]["ip"]))
+            hosts_from_graph = topo['graph'].nodes(data='ip')
+            for host in hosts_from_graph:
+                if host[0] == 'h' + str(h):
+                    break
+            print host
+            self.mn_hosts.append(self.addHost('h' + str(h), ip=host[1]))
 
         self.mn_switches = []
         for s in range(topo['n_switches']):
