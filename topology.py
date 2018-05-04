@@ -28,7 +28,7 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
 
     topo["n_hosts"] = n_servers
     for s in range(n_servers):
-        G.add_node('h'+str(s)) 
+        G.add_node('h'+str(s), ip = '10.0.' + str(s) + '.1')
 
     topo["n_switches"] = n_switches
     open_ports = [n_ports] * n_switches 

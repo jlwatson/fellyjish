@@ -31,8 +31,10 @@ from pox.lib.addresses import IP_BROADCAST, IP_ANY
 from pox.lib.revent import *
 from pox.lib.util import dpid_to_str
 from pox.proto.dhcpd import DHCPLease, DHCPD
+import pox.proto.arp_responder as arp
 from collections import defaultdict
 from pox.openflow.discovery import Discovery
+import pickle
 import time
 
 log = core.getLogger()
@@ -40,6 +42,8 @@ log = core.getLogger()
 switches_by_dpid = {}
 
 mac_to_port = {}
+
+topo = pickle.load(open('small_topo.pickle', 'r'))
 
 class TopoSwitch (object):
   """
@@ -95,9 +99,6 @@ class TopoSwitch (object):
     """
     Implement switch-like behavior.
     """
-
-    
-
     # Here's some psuedocode to start you off implementing a learning
     # switch.  You'll need to rewrite it as real Python code.
 
@@ -146,7 +147,7 @@ class TopoSwitch (object):
     """
     Handles packet in messages from the switch.
     """
-    log.info("event mac is " + str(event.parsed))
+    # log.info("event mac is " + str(event.parsed))
     packet = event.parsed # This is the parsed packet data.
     if not packet.parsed:
       log.warning("Ignoring incomplete packet")
@@ -162,11 +163,13 @@ class TopoSwitch (object):
     log.info("At switch " + str(hex(event.dpid)) + ". Src mac is " + str(packet.src) + ", dest mac is " + str(packet.dst))
     log.info("Coming in at port " + str(event.port))
     log.info("event ip " + str(packet.find('ipv4')))
+    log.info("%s" % G.nodes)
+
     # log.info("Src: " + str(packet.src))
     # log.info("Dest: " + str(packet.dst))
     # log.info("Event port: " + str(event.port))
     #self.act_like_hub(packet, packet_in)
-    log.info("packet in")
+    # log.info("packet in")
     self.act_like_switch(packet, packet_in, event)
 
 
@@ -186,11 +189,10 @@ def launch ():
       
       sw = TopoSwitch(event.connection)
       switches_by_dpid[event.dpid] = sw
-      #sw.connect(event.connection)
 
     else:
       log.info("in the found case, dpid is " + str(event.dpid))
-      #sw.connect(event.connection)
-    #TopoSwitch(event.connection)
 
   core.openflow.addListenerByName("ConnectionUp", start_switch)
+  arp.launch();
+

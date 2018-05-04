@@ -19,166 +19,57 @@ from mininet.util import dumpNodeConnections, dumpNetConnections
 
 import pickle
 
-def generate_topology(n_servers, n_switches, n_ports, debug=False):
-    if debug:
-        random.seed(0xbeef)
 
-    topo = {} # generated result goes here
-
-    if n_ports < 2:
-        raise ValueError("Number of ports per switch must be >= 2")
-
-    if n_switches < n_servers:
-        raise ValueError("Number of servers must be greater than or equal to number of hosts (simulated racks)")
-
-    print("Generating Fellyjish topology: %d servers, %d switches, %d ports per switch" % (n_servers, n_switches, n_ports))
-
-    hosts = []
-    for s in range(n_servers):
-        hosts.append('h'+str(s))
-    topo["hosts"] = hosts
-
-    switches = []
-    open_ports = [n_ports] * n_switches 
-    for sw in range(n_switches):
-        curr_switch = 's'+str(sw)
-        if sw < n_servers: # match switch and paired host
-            open_ports[sw] -= 1
-        switches.append(curr_switch)
-    topo["switches"] = switches
-
-    # randomly link the remaining open ports
-    links = defaultdict(list)
-    while sum(open_ports) > 1:
-        open_switches = [x for x in range(n_switches) if open_ports[x] > 0]
-        if len(open_switches) == 1: # special case with two ports remaining on same switch
-            curr = open_switches[0]
-            if curr >= 2:
-                other_switches = [s for s in range(n_switches) if s != curr]
-                x = random.choice(other_switches)
-                y = random.choice(links[x])
-                links[x].remove(y)
-                links[y].remove(x)
-                links[curr].append(x)
-                links[curr].append(y)
-                links[x].append(curr)
-                links[y].append(curr)
-                open_ports[curr] -= 2
-                continue
-
-        start_over = False
-        while True:
-            x = random.choice(open_switches)
-            unconnected_switches = [s for s in open_switches if (s not in links[x] and s != x)]
-            if len(unconnected_switches) == 0:
-                no_new_links = True
-                for os in open_switches:
-                    for os2 in open_switches:
-                        if os != os2:
-                            no_new_links = no_new_links and os2 in links[os]
-                if no_new_links:
-                    start_over = True
-                    break
-            else:
-                break
-        
-        if start_over:
-            #wtf fix this
-            open_ports= [n_ports - 1] * n_switches # assume one port only is used for server
-            links = defaultdict(list)
-            continue
-
-        y = random.choice(unconnected_switches)
-        open_ports[x] -= 1
-        open_ports[y] -= 1
-        links[x].append(y)
-        links[y].append(x)
-
-    topo["link_map"] = links
-
-    # generate link pairs and add to network
-    link_pairs = set()
-    for s1 in links:
-        for s2 in links[s1]:
-            link_pairs.add((s1, s2) if s1 < s2 else (s2, s1))
-    topo["link_pairs"] = link_pairs
-
-    return topo
+def mac_from_value(v):
+    return ':'.join(s.encode('hex') for s in ('%0.12x' % v).decode('hex'))
 
 
 class JellyFishTop(Topo):
 
     def build(self):
-        #topo_map = generate_topology(100, 200, 4, debug=True)
-        #print topo_map
-
         topo = pickle.load(open('small_topo.pickle', 'r'))
 
-        mn_hosts = []
+        self.mn_hosts = []
         for h in range(topo['n_hosts']):
-            mn_hosts.append(self.addHost('h' + str(h+1), mac='00:00:00:00:11:' + str(hex(h + 1))))
+            self.mn_hosts.append(self.addHost('h' + str(h + 1), ip=topo["graph"].nodes['h'+str(h)]["ip"]))
 
-        mn_switches = []
+        self.mn_switches = []
         for s in range(topo['n_switches']):
-            mn_switches.append(self.addSwitch('s' + str(s + 1), mac='00:00:00:00:00:' + str(hex(s + 1))))
+            self.mn_switches.append(self.addSwitch('s' + str(s + 1), mac=mac_from_value(s + 1)))
 
         for e in topo['graph'].edges():
             if e[0][0] == 'h':
-                f1 = mn_hosts[int(e[0][1:])]
+                f1 = self.mn_hosts[int(e[0][1:])]
             else:
-                f1 = mn_switches[int(e[0][1:])]
+                f1 = self.mn_switches[int(e[0][1:])]
 
             if e[1][0] == 'h':
-                f2 = mn_hosts[int(e[1][1:])]
+                f2 = self.mn_hosts[int(e[1][1:])]
             else:
-                f2 = mn_switches[int(e[1][1:])]
+                f2 = self.mn_switches[int(e[1][1:])]
 
             self.addLink(f1, f2)
 
 
-        # leftHost = self.addHost( 'h1' )
-        # rightHost = self.addHost( 'h2' )
-        # leftSwitch = self.addSwitch( 's3' )
-        # rightSwitch = self.addSwitch( 's4', mac='00:00:00:00:00:04')
-        # # Add links
-        # self.addLink( leftHost, leftSwitch )
-        # self.addLink( leftSwitch, rightSwitch )
-        # self.addLink( rightSwitch, rightHost )
-
-        """
-        mn_hosts = []
-        for h in topo_map["hosts"]:
-            mn_hosts.append(self.addHost(h))
-
-        mn_switches = []
-        for i, s in enumerate(topo_map["switches"]):
-            switch = self.addSwitch(s)
-            mn_switches.append(switch)
-            if i < len(topo_map["hosts"]):
-                self.addLink(mn_hosts[i], switch)
-
-        for p in topo_map["link_pairs"]:
-            self.addLink(mn_switches[p[0]], mn_switches[p[1]])
-            """
-
-
-        
-
-
-def experiment(net):
+def experiment(net, topo):
     dumpNetConnections(net)
     net.start()
     sleep(3)
-    net.pingAll()
+    net.pingFull(hosts=net.hosts[:4])
     net.stop()
 
 def main():
-    #topo_map = generate_topology(100, 200, 4, debug=True)
-
     topo = JellyFishTop()
-
     net = Mininet(topo=topo, host=CPULimitedHost, link = TCLink, controller=JELLYPOX)
-    experiment(net)
+
+    # set host MAC addresses
+    host_mac_base = len(topo.mn_switches)
+    for i, h in enumerate(topo.mn_hosts):
+        mn_host = net.getNodeByName(h)
+        print h, mac_from_value(host_mac_base + i + 1)
+        mn_host.setMAC(mac_from_value(host_mac_base + i + 1))
+
+    experiment(net, topo)
 
 if __name__ == "__main__":
     main()
