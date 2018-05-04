@@ -18,6 +18,17 @@ def k_shortest_paths(G, start, end, k):
     return list(islice(nx.shortest_simple_paths(G, start, end), k))
 
 
+def ecmp(G, start, end, k):
+    paths = []
+    for p in nx.shortest_simple_paths(G, start, end):
+        if len(paths) < k and (len(paths) == 0 or len(p) == len(paths[0])):
+            paths.append(p)
+        else:
+            break
+
+    return paths
+
+
 def host_to_switch(topo, h_idx):
     n_switches = topo["n_switches"]
     while h_idx >= n_switches:
@@ -26,18 +37,26 @@ def host_to_switch(topo, h_idx):
 
 
 def random_permutation(topo):
-
     hosts = list(range(topo["n_hosts"])) 
     random.shuffle(hosts)
 
     pairings = []
     while len(hosts) > 1:
         x, y = hosts[0], hosts[1]
-        hosts = hosts[2:]
+
+        x_switch = host_to_switch(topo, x)
+        y_switch = host_to_switch(topo, y)
+
+        # if x and y are at the same switch, reshuffle remaining hosts and retry
+        if x_switch == y_switch:
+            random.shuffle(hosts)
+            continue
+
         pairings.append((
-            's'+str(host_to_switch(topo, x)),
-            's'+str(host_to_switch(topo, y))
+            's'+str(x_switch),
+            's'+str(y_switch)
         ))
+        hosts = hosts[2:]
 
     return pairings
 
@@ -47,7 +66,6 @@ def is_switch_node(node_name):
 
 
 def generate_path_counts(topo, algorithm, k, max_paths_on_link):
-
     sys.stdout.write("Generating paths using %s (k=%d).." % (algorithm, k))
     sys.stdout.flush()
 
@@ -59,10 +77,12 @@ def generate_path_counts(topo, algorithm, k, max_paths_on_link):
         paths = []
         for switch1, switch2 in switch_pairs:
             if algorithm == 'k-shortest':
-                paths += k_shortest_paths(topo["graph"], switch1, switch2, k)
-                paths += k_shortest_paths(topo["graph"], switch2, switch1, k)
-            elif algorithm == 'ecmp':
-                pass
+                fn = k_shortest_paths
+            else: # algorithm == 'ecmp':
+                fn = ecmp
+
+            paths += fn(topo["graph"], switch1, switch2, k)
+            paths += fn(topo["graph"], switch2, switch1, k)
 
         link_paths = {}
         for (u, v) in topo["graph"].edges():
@@ -73,7 +93,8 @@ def generate_path_counts(topo, algorithm, k, max_paths_on_link):
         for p in paths:
             for i in range(len(p)-1):
                 link_paths[(p[i], p[i+1])] += 1
-
+        sys.stdout.write(str(max(link_paths.values())))
+        sys.stdout.flush()
         if max(link_paths.values()) <= max_paths_on_link:
             break
 
@@ -137,7 +158,9 @@ if __name__ == "__main__":
             pickle.dump(topo, f)
 
     # Calculate the random permutation traffic paths across the graph
-    link_paths = generate_path_counts(topo, 'k-shortest', 8, 18)
+    # link_paths = generate_path_counts(topo, 'k-shortest', 8, 18)
+    link_paths = generate_path_counts(topo, 'ecmp', 8, 10)
+    # link_paths = generate_path_counts(topo, 'ecmp', 64, 13)
     max_paths = max(link_paths.values())
 
     # Summarize data for graph
