@@ -7,7 +7,7 @@ Diveesh Singh and Jean-Luc Watson
 
 #### Figure 9
 
-![Our reproduction of Figure 9](https://imgur.com/oT9jFuo.png)
+<img src="https://imgur.com/oT9jFuo.png" alt="Our reproduction of Figure 9" width="300px"></img>
 
 TODO: describe
 TODO: instructions to run and retrieve results (currently just `python main.py`)
