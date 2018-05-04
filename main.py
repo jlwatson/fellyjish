@@ -94,7 +94,7 @@ def generate_path_counts(topo, algorithm, k, target_paths_on_link):
             for i in range(len(p)-1):
                 link_paths[(p[i], p[i+1])] += 1
 
-        if True: #max(link_paths.values()) == target_paths_on_link:
+        if max(link_paths.values()) == target_paths_on_link:
             break
 
     sys.stdout.write(" done\n")
