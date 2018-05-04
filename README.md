@@ -1,8 +1,18 @@
 # Fellyjish
 ### CS244 Assignment 2 (Spring 2018) - Jellyfish Reproduction
 
+Diveesh Singh and Jean-Luc Watson
 
-Diveesh Singh && Jean-Luc Watson
+### Progress Report
 
-Reproduces Figure 9 and Table 1 from the Jellyfish NSDI paper located [here](https://people.inf.ethz.ch/asingla/papers/jellyfish-nsdi12.pdf).
+#### Figure 9
+
+![Our reproduction of Figure 9](https://imgur.com/a/P1euzuj)
+
+TODO: describe
+
+
+#### Mininet Topology
+
+TODO: describe
 
