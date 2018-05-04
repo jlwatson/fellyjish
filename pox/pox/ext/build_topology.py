@@ -1,25 +1,21 @@
-import argparse
 import os
-import pickle
+import sys
 import random
-
 from collections import defaultdict
-from subprocess import Popen
-
-from mininet.net import Mininet
 from mininet.topo import Topo
-from mininet.node import Controller
-from mininet.node import RemoteController
-from mininet.node import OVSController
+from mininet.net import Mininet
 from mininet.node import CPULimitedHost
 from mininet.link import TCLink
+from mininet.node import OVSController
+from mininet.node import Controller
+from mininet.node import RemoteController
 from mininet.cli import CLI
-from mininet.util import dumpNetConnections
-
-
+sys.path.append("../../")
+from pox.ext.jelly_pox import JELLYPOX
+from subprocess import Popen
+from time import sleep, time
 
 def generate_topology(n_servers, n_switches, n_ports, debug=False):
-
     if debug:
         random.seed(0xbeef)
 
@@ -83,11 +79,8 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
                 break
         
         if start_over:
-            open_ports = [n_ports] * n_switches 
-            for sw in range(n_switches):
-                curr_switch = 's'+str(sw)
-                if sw < n_servers: # match switch and paired host
-                    open_ports[sw] -= 1
+            #wtf fix this
+            open_ports= [n_ports - 1] * n_switches # assume one port only is used for server
             links = defaultdict(list)
             continue
 
@@ -103,7 +96,7 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
     link_pairs = set()
     for s1 in links:
         for s2 in links[s1]:
-            link_pairs.add((s1, s2)) # if s1 < s2 else (s2, s1)
+            link_pairs.add((s1, s2) if s1 < s2 else (s2, s1))
     topo["link_pairs"] = link_pairs
 
     return topo
@@ -111,11 +104,20 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
 
 class JellyFishTop(Topo):
 
-    def __init__(self, topo_map):
-        self.topo_map = topo_map
-
     def build(self):
-        topo_map = self.topo_map
+        topo_map = generate_topology(100, 200, 4, debug=True)
+        print topo_map
+
+        leftHost = self.addHost( 'h1' )
+        rightHost = self.addHost( 'h2' )
+        leftSwitch = self.addSwitch( 's3' )
+        rightSwitch = self.addSwitch( 's4' )
+        # Add links
+        self.addLink( leftHost, leftSwitch )
+        self.addLink( leftSwitch, rightSwitch )
+        self.addLink( rightSwitch, rightHost )
+
+        """
         mn_hosts = []
         for h in topo_map["hosts"]:
             mn_hosts.append(self.addHost(h))
@@ -129,19 +131,25 @@ class JellyFishTop(Topo):
 
         for p in topo_map["link_pairs"]:
             self.addLink(mn_switches[p[0]], mn_switches[p[1]])
+            """
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Build fellyjish topology.")
-    parser.add_argument('--debug', help='run in debug mode (same random seed)', action='store_true')
-    parser.add_argument('--pickle', help='Topo pickle file path', default=None)
-    args = parser.parse_args()
-    
-    topo_map = generate_topology(n_servers=3, n_switches=6, n_ports=3, debug=args.debug)
-    with open(args.pickle, 'wb') as f:
-        pickle.dump(topo_map, f)
         
 
-    # TODO: move Mininet stuff somewhere else
-    # topo = JellyFishTop(topo_map=topo_map)
+
+def experiment(net):
+        net.start()
+        sleep(3)
+        net.pingAll()
+        net.stop()
+
+def main():
+    #topo_map = generate_topology(100, 200, 4, debug=True)
+
+    topo = JellyFishTop()
+    net = Mininet(topo=topo, host=CPULimitedHost, link = TCLink, controller=JELLYPOX)
+    experiment(net)
+
+if __name__ == "__main__":
+    main()
 
