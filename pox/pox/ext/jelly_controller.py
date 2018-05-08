@@ -120,14 +120,11 @@ class TopoSwitch (object):
   def act_like_switch (self, packet, packet_in, event, srchost, dsthost, packet_id):
     packet_paths = _get_paths(srchost, dsthost)
     path = packet_paths[packet_id % num_paths]
-    log.info('im at switch ' + self.name)
-    log.info('path: ' + str(packet_paths))
-    next_host_index = path.index(self.name) + 1
-    log.info('next host index: ' + str(next_host_index))
-    log.info('next host: ' + str(path[next_host_index]))
+    next_host_index = path.index(self.graph_name) + 1
 
-    out_port = 1 #figure out outport lol
-    self.resend_packet(packet_in, out_port)
+    outport = topo['outport_mappings'][(self.graph_name, path[next_host_index])]
+    log.info("Sending packet " + str(packet_id) + " from " + self.graph_name + " to " + str(path[next_host_index]) + " on port " + str(outport))
+    self.resend_packet(packet_in, outport)
 
   def _handle_PacketIn (self, event):
     """
@@ -135,7 +132,7 @@ class TopoSwitch (object):
     """
 
     packet = event.parsed # This is the parsed packet data.
-    log.info("makin some moves BETCHHHH")
+    log.info("makin some moves big d")
     if not packet.parsed:
       log.warning("Ignoring incomplete packet")
       return
@@ -180,5 +177,5 @@ def launch ():
     log.info("DPID is "  + str(event.dpid))
     TopoSwitch(event.connection, event.dpid)
   core.openflow.addListenerByName("ConnectionUp", start_switch)
-  st.launch()
   arp.launch()
+  #st.launch()

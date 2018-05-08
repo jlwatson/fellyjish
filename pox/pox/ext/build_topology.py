@@ -41,23 +41,26 @@ class JellyFishTop(Topo):
 
         self.mn_switches = []
         for s in range(topo['n_switches']):
-            print "00:00:00:00:11:" + str("{:02x}".format(s))
-            self.mn_switches.append(self.addSwitch('s' + str(s), mac="00:00:00:00:11:" + str("{:02x}".format(s))))
+            self.mn_switches.append(self.addSwitch('s' + str(s + 1), mac="00:00:00:00:00:" + str("{:02x}".format(s + 1))))
 
         for e in topo['graph'].edges():
             print e
             if e[0][0] == 'h':
                 f1 = self.mn_hosts[int(e[0][1:])]
+                f1_graph = f1
             else:
                 f1 = self.mn_switches[int(e[0][1:])]
+                f1_graph = 's' + str(int(f1[1:]) - 1)
 
             if e[1][0] == 'h':
                 f2 = self.mn_hosts[int(e[1][1:])]
+                f2_graph = f2
             else:
                 f2 = self.mn_switches[int(e[1][1:])]
+                f2_graph = 's' + str(int(f2[1:]) - 1)
 
-            port1 = outport_mappings[(f1, f2)]
-            port2 = outport_mappings[(f2, f1)]
+            port1 = outport_mappings[(f1_graph, f2_graph)]
+            port2 = outport_mappings[(f2_graph, f1_graph)]
             self.addLink(f1, f2, port1=port1, port2=port2)
 
 
