@@ -44,24 +44,51 @@ class JellyFishTop(Topo):
             self.mn_switches.append(self.addSwitch('s' + str(s + 1), mac="00:00:00:00:00:" + str("{:02x}".format(s + 1))))
 
         for e in topo['graph'].edges():
-            print e
             if e[0][0] == 'h':
                 f1 = self.mn_hosts[int(e[0][1:])]
                 f1_graph = f1
+                switch1 = False
             else:
                 f1 = self.mn_switches[int(e[0][1:])]
                 f1_graph = 's' + str(int(f1[1:]) - 1)
+                switch1 = True 
 
             if e[1][0] == 'h':
                 f2 = self.mn_hosts[int(e[1][1:])]
                 f2_graph = f2
+                switch2 = False
             else:
                 f2 = self.mn_switches[int(e[1][1:])]
                 f2_graph = 's' + str(int(f2[1:]) - 1)
+                switch2 = True 
 
             port1 = outport_mappings[(f1_graph, f2_graph)]
             port2 = outport_mappings[(f2_graph, f1_graph)]
-            self.addLink(f1, f2, port1=port1, port2=port2)
+            if switch1 and switch2:
+                bw = 1
+            else:
+                bw = 1
+            print f1, f2
+            self.addLink(f1, f2, bw=bw, port1=port1, port2=port2)
+
+        self.topo = topo
+
+
+def random_permutation(topo):
+    hosts = list(range(topo.topo["n_hosts"])) 
+    random.shuffle(hosts)
+
+    pairings = []
+    while len(hosts) > 1:
+        x, y = hosts[0], hosts[1]
+
+        pairings.append((
+            'h'+str(x),
+            'h'+str(y)
+        ))
+        hosts = hosts[2:]
+
+    return pairings
 
 
 def experiment(net, topo):
@@ -69,7 +96,20 @@ def experiment(net, topo):
     net.start()
     sleep(3)
     net.pingAll()
-    net.stop()
+
+    perm = random_permutation(topo)
+    for pair in perm:
+        host_a = net.getNodeByName(pair[0])
+        host_b = net.getNodeByName(pair[1])
+
+        print "Host %s -> Host %s" % (pair[0], pair[1])
+
+        host_a.sendCmd("iperf", "-s")
+        host_b.sendCmd("iperf", "-c", "10.0."+ pair[0][1:] +".1")
+
+        output = host_b.waitOutput()
+        print output
+
 
 def main():
     topo = JellyFishTop()

@@ -30,7 +30,7 @@ import networkx as nx
 from itertools import islice
 import pox.openflow.spanning_tree as st
 
-topo = pickle.load(open('/home/diveesh/fellyjish/pox/pox/ext/small_topo.pickle', 'r'))
+topo = pickle.load(open('/home/jeanluc.watson/fellyjish/pox/pox/ext/small_topo.pickle', 'r'))
 
 log = core.getLogger()
 paths = {}
@@ -130,7 +130,7 @@ class TopoSwitch (object):
 
   def act_like_switch (self, packet, packet_in, event, srchost, dsthost, packet_id):
     packet_paths = _get_paths(srchost, dsthost)
-    path = packet_paths[packet_id % num_paths]
+    path = packet_paths[packet_id % len(packet_paths)]
     next_host_index = path.index(self.graph_name) + 1
 
     outport = topo['outport_mappings'][(self.graph_name, path[next_host_index])]
