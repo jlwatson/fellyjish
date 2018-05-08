@@ -1,119 +1,141 @@
 import argparse
 import os
-import pickle
+import sys
 import random
-
 from collections import defaultdict
-from subprocess import Popen
-
-from mininet.net import Mininet
 from mininet.topo import Topo
-from mininet.node import Controller
-from mininet.node import RemoteController
-from mininet.node import OVSController
+from mininet.net import Mininet
 from mininet.node import CPULimitedHost
 from mininet.link import TCLink
+from mininet.node import OVSController
+from mininet.node import Controller
+from mininet.node import RemoteController
 from mininet.cli import CLI
-from mininet.util import dumpNetConnections
+sys.path.append("../../")
+from pox.ext.jelly_pox import JELLYPOX
+from subprocess import Popen
+from time import sleep, time
+
+from mininet.util import dumpNodeConnections, dumpNetConnections
+
+import pickle
+
+
+def mac_from_value(v):
+    return ':'.join(s.encode('hex') for s in ('%0.12x' % v).decode('hex'))
 
 
 class JellyFishTop(Topo):
 
-    def build(self, nServers, nSwitches, nPorts):
-
-        if nPorts < 2:
-            raise ValueError("Number of ports per switch must be >= 2")
-
-        if nSwitches < nServers:
-            raise ValueError("Number of servers must be greater than or equal to number of hosts (simulated racks)")
-
-        print("Creating topology: %d servers, %d switches, %d ports per switch" % (nServers, nSwitches, nPorts))
-
-        hosts = []
-        for s in range(nServers):
-            hosts.append(self.addHost('h'+str(s), mac='00:00:00:00:00:0'+str(s)))
-
-        switches = []
-        openPorts = [nPorts] * nSwitches 
-        for sw in range(nSwitches):
-            currSwitch = self.addSwitch('s'+str(sw))
-            if sw < nServers: # match switch and paired host
-                self.addLink(hosts[sw], currSwitch)
-                openPorts[sw] -= 1
-            switches.append(currSwitch)
-        # randomly link the remaining open ports
-        links = defaultdict(list)
-        while sum(openPorts) > 1:
-            openSwitches = [x for x in range(nSwitches) if openPorts[x] > 0]
-            # print openSwitches
-            if len(openSwitches) == 1: # special case with two ports remaining on same switch
-                curr = openSwitches[0]
-                if curr >= 2:
-                    otherSwitches = [s for s in range(nSwitches) if s != curr]
-                    x = random.choice(otherSwitches)
-                    y = random.choice(links[x])
-                    print 'HITME~~!~!~!~'
-                    links[x].remove(y)
-                    links[y].remove(x)
-                    links[curr].append(x)
-                    links[curr].append(y)
-                    links[x].append(curr)
-                    links[y].append(curr)
-                    openPorts[curr] -= 2
-                    continue
-
-            startOver = False
-            while True:
-                x = random.choice(openSwitches)
-                unconnectedSwitches = [s for s in openSwitches if (s not in links[x] and s != x)]
-                if len(unconnectedSwitches) == 0:
-                    noNewLinks = True
-                    for os in openSwitches:
-                        for os2 in openSwitches:
-                            if os != os2:
-                                noNewLinks = noNewLinks and os2 in links[os]
-                    if noNewLinks:
-                        startOver = True
-                        break
-                else:
+    def build(self, pkl):
+        topo = pickle.load(open(pkl, 'r'))
+        outport_mappings = topo['outport_mappings']
+        print outport_mappings
+        self.mn_hosts = []
+        for h in range(topo['n_hosts']):
+            hosts_from_graph = topo['graph'].nodes(data='ip')
+            for host in hosts_from_graph:
+                if host[0] == 'h' + str(h):
                     break
-            
-            if startOver:
-                openPorts = [nPorts - 1] * nSwitches # assume one port only is used for server
-                links = defaultdict(list)
-                continue
+            print host
+            self.mn_hosts.append(self.addHost('h' + str(h), ip=host[1]))
 
-            y = random.choice(unconnectedSwitches)
-            openPorts[x] -= 1
-            openPorts[y] -= 1
-            links[x].append(y)
-            links[y].append(x)
+        self.mn_switches = []
+        for s in range(topo['n_switches']):
+            self.mn_switches.append(self.addSwitch('s' + str(s + 1), mac="00:00:00:00:00:" + str("{:02x}".format(s + 1))))
 
-        # generate link pairs and add to network
-        link_pairs = set()
-        for s1 in links:
-            for s2 in links[s1]:
-                link_pairs.add((s1, s2) if s1 < s2 else (s2, s1))
+        for e in topo['graph'].edges():
+            if e[0][0] == 'h':
+                f1 = self.mn_hosts[int(e[0][1:])]
+                f1_graph = f1
+                switch1 = False
+            else:
+                f1 = self.mn_switches[int(e[0][1:])]
+                f1_graph = 's' + str(int(f1[1:]) - 1)
+                switch1 = True 
 
-        # XXX: for now, remove cycles in graph
-        # link_pairs.remove((1, 5))
-        # link_pairs.remove((2, 5))
+            if e[1][0] == 'h':
+                f2 = self.mn_hosts[int(e[1][1:])]
+                f2_graph = f2
+                switch2 = False
+            else:
+                f2 = self.mn_switches[int(e[1][1:])]
+                f2_graph = 's' + str(int(f2[1:]) - 1)
+                switch2 = True 
 
-        for p in link_pairs:
-            self.addLink(switches[p[0]], switches[p[1]])
+            port1 = outport_mappings[(f1_graph, f2_graph)]
+            port2 = outport_mappings[(f2_graph, f1_graph)]
+            if switch1 and switch2:
+                bw = 20
+            else:
+                bw = 10
+            print f1, f2
+            self.addLink(f1, f2, bw=5, port1=port1, port2=port2, use_htb=True)
 
+        self.topo = topo
+
+
+def random_permutation(topo):
+    hosts = list(range(topo.topo["n_hosts"])) 
+    random.shuffle(hosts)
+
+    pairings = []
+    while len(hosts) > 1:
+        x, y = hosts[0], hosts[1]
+
+        pairings.append((
+            'h'+str(x),
+            'h'+str(y)
+        ))
+        hosts = hosts[2:]
+
+    return pairings
+
+
+def experiment(net, topo):
+    dumpNetConnections(net)
+    net.start()
+    sleep(3)
+    net.pingAll()
+
+    perm = random_permutation(topo)
+    for pair in perm:
+        host_a = net.getNodeByName(pair[0])
+        host_b = net.getNodeByName(pair[1])
+
+        print "Host %s -> Host %s" % (pair[0], pair[1])
+
+        host_a.sendCmd("iperf", "-s", "-t", "20")
+        host_b.sendCmd("iperf", "-c", "10.0."+ pair[0][1:] +".1", "-t", "20", "-P", "8")
+
+        output = host_b.waitOutput()
+        print output
+
+
+def main(pkl):
+
+    topo = JellyFishTop(pkl)
+    net = Mininet(topo=topo, host=CPULimitedHost, link = TCLink, controller=JELLYPOX("jelly", cargs2=("--p=%s" % pkl)))
+
+    # set host MAC addresses
+    host_mac_base = len(topo.mn_switches)
+    for i, h in enumerate(topo.mn_hosts):
+        mn_host = net.getNodeByName(h)
+        print h, mac_from_value(host_mac_base + i + 1)
+        mn_host.setMAC(mac_from_value(host_mac_base + i + 1))
+        for j, h2 in enumerate(topo.mn_hosts):
+            if i == j: continue
+            mn_host2 = net.getNodeByName(h2)
+            print "Setting arp for host " + str(h) + ", index " + str(i) + ". j " + str(j) + ", mac is " + mac_from_value(host_mac_base + j + 1)
+            mn_host.setARP('10.0.' + str(j) + '.1', mac_from_value(host_mac_base + j + 1))
+
+    experiment(net, topo)
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="Build fellyjish topology.")
-    parser.add_argument('--debug', help='run in debug mode (same random seed)', action='store_true')
-    parser.add_argument('--pickle', help='Topo pickle file path', default='topo.pickle')
+    parser = argparse.ArgumentParser(description="Run Jellyfish topology.")
+    parser.add_argument('--pickle', help='Topology pickle input path', default=None)
     args = parser.parse_args()
-    
-    if args.debug:
-        random.seed(0xbeef)
 
-    topo = JellyFishTop(nServers=3, nSwitches=6, nPorts=3)
-    with open(args.pickle, 'wb') as f:
-        pickle.dump(topo, f)
+    main(args.pickle)
 
