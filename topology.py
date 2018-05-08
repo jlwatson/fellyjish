@@ -42,7 +42,6 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
         while i < n_servers:
             G.add_edge('h'+str(i), curr_switch)
             outport_mappings[(curr_switch, 'h'+str(i))] = open_ports[sw]
-            print "adding host->switch " + str(('h'+str(i), curr_switch))
             outport_mappings[('h'+str(i), curr_switch)] = 1
             i += n_switches
             open_ports[sw] -= 1
@@ -61,8 +60,8 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
                 x = 's'+str(random.choice(other_switches))
                 y = random.choice(list(nx.all_neighbors(G, x)))
                 G.remove_edge(x, y)
-                x_port = outport_mappings.pop(('s'+str(x), 's'+str(y)))
-                y_port = outport_mappings.pop(('s'+str(y), 's'+str(x)))
+                x_port = outport_mappings.pop((x, y))
+                y_port = outport_mappings.pop((y, x))
                 G.add_edge(x, 's'+str(curr))
                 G.add_edge(y, 's'+str(curr))
                 outport_mappings[(x, 's'+str(curr))] = x_port
