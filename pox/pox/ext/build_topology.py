@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 import random
@@ -26,8 +27,8 @@ def mac_from_value(v):
 
 class JellyFishTop(Topo):
 
-    def build(self):
-        topo = pickle.load(open('small_topo.pickle', 'r'))
+    def build(self, pkl):
+        topo = pickle.load(open(pkl, 'r'))
         outport_mappings = topo['outport_mappings']
         print outport_mappings
         self.mn_hosts = []
@@ -64,12 +65,8 @@ class JellyFishTop(Topo):
 
             port1 = outport_mappings[(f1_graph, f2_graph)]
             port2 = outport_mappings[(f2_graph, f1_graph)]
-            if switch1 and switch2:
-                bw = 1
-            else:
-                bw = 1
             print f1, f2
-            self.addLink(f1, f2, bw=bw, port1=port1, port2=port2)
+            self.addLink(f1, f2, bw=5, port1=port1, port2=port2, use_htb=True)
 
         self.topo = topo
 
@@ -104,16 +101,17 @@ def experiment(net, topo):
 
         print "Host %s -> Host %s" % (pair[0], pair[1])
 
-        host_a.sendCmd("iperf", "-s")
-        host_b.sendCmd("iperf", "-c", "10.0."+ pair[0][1:] +".1")
+        host_a.sendCmd("iperf", "-s", "-t", "20")
+        host_b.sendCmd("iperf", "-c", "10.0."+ pair[0][1:] +".1", "-t", "20", "-P", "8")
 
         output = host_b.waitOutput()
         print output
 
 
-def main():
-    topo = JellyFishTop()
-    net = Mininet(topo=topo, host=CPULimitedHost, link = TCLink, controller=JELLYPOX)
+def main(pkl):
+
+    topo = JellyFishTop(pkl)
+    net = Mininet(topo=topo, host=CPULimitedHost, link = TCLink, controller=JELLYPOX("jelly", cargs2=("--p=%s" % pkl)))
 
     # set host MAC addresses
     host_mac_base = len(topo.mn_switches)
@@ -130,5 +128,10 @@ def main():
     experiment(net, topo)
 
 if __name__ == "__main__":
-    main()
+
+    parser = argparse.ArgumentParser(description="Run Jellyfish topology.")
+    parser.add_argument('--pickle', help='Topology pickle input path', default=None)
+    args = parser.parse_args()
+
+    main(args.pickle)
 
