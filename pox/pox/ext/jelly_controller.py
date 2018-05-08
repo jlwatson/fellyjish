@@ -29,12 +29,13 @@ import time
 import networkx as nx
 from itertools import islice
 import pox.openflow.spanning_tree as st
+from pox.lib.addresses import IPAddr
 
-topo = pickle.load(open('/home/jeanluc.watson/fellyjish/pox/pox/ext/small_topo.pickle', 'r'))
+topo = pickle.load(open('/home/diveesh/fellyjish/pox/pox/ext/small_topo.pickle', 'r'))
 
 log = core.getLogger()
 paths = {}
-algo = 'ecmp'
+algo = 'kshort'
 num_paths = 8
 switches_by_dpid = {}
 
@@ -136,6 +137,9 @@ class TopoSwitch (object):
     outport = topo['outport_mappings'][(self.graph_name, path[next_host_index])]
     log.info("Sending packet " + str(packet_id) + " from " + self.graph_name + " to " + str(path[next_host_index]) + " on port " + str(outport))
     self.resend_packet(packet_in, outport)
+    return outport
+
+    
 
   def _handle_PacketIn (self, event):
     """
@@ -155,21 +159,45 @@ class TopoSwitch (object):
     log.info("event ip " + str(packet.find('ipv4')))
     log.info(topo['graph'].nodes(data='ip'))
 
-    ipv4 = packet.find('ipv4')
-    if ipv4 is not None:
-      log.info('src ip is ' + str(ipv4.srcip))
-      log.info('dst ip is ' + str(ipv4.dstip))
-      log.info('packet id is ' + str(ipv4.id))
-      srcip = ipv4.srcip
-      dstip = ipv4.dstip
-      hosts = topo['graph'].nodes(data='ip')
-      for host in hosts:
-        if host[1] == srcip:
-          srchost = host[0]
-        if host[1] == dstip:
-          dsthost = host[0]
-      log.info("src host: " + str(srchost) + ", dsthost: " + str(dsthost))
-      self.act_like_switch(packet, packet_in, event, srchost, dsthost, ipv4.id)
+    tcpp = packet.find('tcp')
+    if tcpp is not None:
+      log.info(tcpp)
+      log.info("ALRIGHT OKAY OKAY ALRIGHT")
+      msg = of.ofp_flow_mod()
+      msg.priority = 42
+      msg.match.dl_type = 0x800
+      msg.match.nw_proto = 6
+      msg.match.tp_src = tcpp.srcport #get src port
+      ipv4 = packet.find('ipv4')
+      if ipv4 is not None: #should not be none, cuz if its TCP, it has to be IP as well
+        srcip = ipv4.srcip
+        dstip = ipv4.dstip
+        msg.match.nw_src = IPAddr(ipv4.srcip)
+        msg.match.nw_dst = IPAddr(ipv4.dstip)
+        hosts = topo['graph'].nodes(data='ip')
+        for host in hosts:
+          if host[1] == srcip:
+            srchost = host[0]
+          if host[1] == dstip:
+            dsthost = host[0]
+        outport = self.act_like_switch(packet, packet_in, event, srchost, dsthost, tcpp.srcport)
+        msg.actions.append(of.ofp_action_output(port = outport))
+        self.connection.send(msg)
+      # 
+    else:
+      ipv4 = packet.find('ipv4')
+      if ipv4 is not None:
+        log.info("just the ping case")
+        srcip = ipv4.srcip
+        dstip = ipv4.dstip
+        hosts = topo['graph'].nodes(data='ip')
+        for host in hosts:
+          if host[1] == srcip:
+            srchost = host[0]
+          if host[1] == dstip:
+            dsthost = host[0]
+        log.info("src host: " + str(srchost) + ", dsthost: " + str(dsthost))
+        self.act_like_switch(packet, packet_in, event, srchost, dsthost, ipv4.id)
 
     # arp_info = packet.find('arp')
     # if arp is not None:
@@ -187,4 +215,6 @@ def launch ():
     log.info("Controlling %s" % (event.connection,))
     log.info("DPID is "  + str(event.dpid))
     TopoSwitch(event.connection, event.dpid)
+
   core.openflow.addListenerByName("ConnectionUp", start_switch)
+
