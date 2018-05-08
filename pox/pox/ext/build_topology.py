@@ -69,7 +69,6 @@ def experiment(net, topo):
     net.start()
     sleep(3)
     net.pingAll()
-    # net.pingFull(hosts=net.hosts)
     net.stop()
 
 def main():
@@ -82,6 +81,11 @@ def main():
         mn_host = net.getNodeByName(h)
         print h, mac_from_value(host_mac_base + i + 1)
         mn_host.setMAC(mac_from_value(host_mac_base + i + 1))
+        for j, h2 in enumerate(topo.mn_hosts):
+            if i == j: continue
+            mn_host2 = net.getNodeByName(h2)
+            print "Setting arp for host " + str(h) + ", index " + str(i) + ". j " + str(j) + ", mac is " + mac_from_value(host_mac_base + j + 1)
+            mn_host.setARP('10.0.' + str(j) + '.1', mac_from_value(host_mac_base + j + 1))
 
     experiment(net, topo)
 

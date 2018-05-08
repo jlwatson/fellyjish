@@ -34,10 +34,16 @@ topo = pickle.load(open('/home/diveesh/fellyjish/pox/pox/ext/small_topo.pickle',
 
 log = core.getLogger()
 paths = {}
-algo = 'kshort'
-num_paths = 4
+algo = 'ecmp'
+num_paths = 8
 switches_by_dpid = {}
 
+def ipinfo (ip):
+  parts = [int(x) for x in str(ip).split('.')]
+  ID = parts[1]
+  port = parts[2]
+  num = parts[3]
+  return switches_by_id.get(ID),port,num
 
 def k_shortest_paths(G, start, end, k):
   return list(islice(nx.shortest_simple_paths(G, start, end), k))
@@ -79,11 +85,16 @@ class TopoSwitch (object):
 
     # This binds our PacketIn event listener
     connection.addListeners(self)
+    #core.ARPHelper.addListeners(self)
 
     # Use this table to keep track of which ethernet address is on
     # which switch port (keys are MACs, values are ports).
     self.mac_to_port = {}
 
+
+  # def _handle_ARPRequest (self, event):
+  #   if ipinfo(event.ip)[0] is not self: return
+  #   event.reply = self.mac
 
   def resend_packet (self, packet_in, out_port):
     """
@@ -177,5 +188,3 @@ def launch ():
     log.info("DPID is "  + str(event.dpid))
     TopoSwitch(event.connection, event.dpid)
   core.openflow.addListenerByName("ConnectionUp", start_switch)
-  arp.launch()
-  #st.launch()
