@@ -66,9 +66,9 @@ class JellyFishTop(Topo):
             port1 = outport_mappings[(f1_graph, f2_graph)]
             port2 = outport_mappings[(f2_graph, f1_graph)]
             if switch1 and switch2:
-                bw = 10
+                bw = 20
             else:
-                bw = 5
+                bw = 10
             print f1, f2
             self.addLink(f1, f2, bw=5, port1=port1, port2=port2, use_htb=True)
 

@@ -139,7 +139,7 @@ class TopoSwitch (object):
         dstip = ipv4.dstip
         msg.match.nw_src = IPAddr(ipv4.srcip)
         msg.match.nw_dst = IPAddr(ipv4.dstip)
-        hosts = topo['graph'].nodes(data='ip')
+        hosts = self.TOPO['graph'].nodes(data='ip')
         for host in hosts:
           if host[1] == srcip:
             srchost = host[0]
@@ -155,7 +155,7 @@ class TopoSwitch (object):
         log.info("just the ping case")
         srcip = ipv4.srcip
         dstip = ipv4.dstip
-        hosts = topo['graph'].nodes(data='ip')
+        hosts = self.TOPO['graph'].nodes(data='ip')
         for host in hosts:
           if host[1] == srcip:
             srchost = host[0]
