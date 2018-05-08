@@ -28,7 +28,8 @@ class JellyFishTop(Topo):
 
     def build(self):
         topo = pickle.load(open('small_topo.pickle', 'r'))
-
+        outport_mappings = topo['outport_mappings']
+        print outport_mappings
         self.mn_hosts = []
         for h in range(topo['n_hosts']):
             hosts_from_graph = topo['graph'].nodes(data='ip')
@@ -40,9 +41,11 @@ class JellyFishTop(Topo):
 
         self.mn_switches = []
         for s in range(topo['n_switches']):
-            self.mn_switches.append(self.addSwitch('s' + str(s + 1), mac=mac_from_value(s + 1)))
+            print "00:00:00:00:11:" + str("{:02x}".format(s))
+            self.mn_switches.append(self.addSwitch('s' + str(s), mac="00:00:00:00:11:" + str("{:02x}".format(s))))
 
         for e in topo['graph'].edges():
+            print e
             if e[0][0] == 'h':
                 f1 = self.mn_hosts[int(e[0][1:])]
             else:
@@ -53,14 +56,17 @@ class JellyFishTop(Topo):
             else:
                 f2 = self.mn_switches[int(e[1][1:])]
 
-            self.addLink(f1, f2)
+            port1 = outport_mappings[(f1, f2)]
+            port2 = outport_mappings[(f2, f1)]
+            self.addLink(f1, f2, port1=port1, port2=port2)
 
 
 def experiment(net, topo):
     dumpNetConnections(net)
     net.start()
     sleep(3)
-    net.pingFull(hosts=net.hosts[:4])
+    net.pingAll()
+    # net.pingFull(hosts=net.hosts)
     net.stop()
 
 def main():

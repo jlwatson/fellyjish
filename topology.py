@@ -31,6 +31,7 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
         G.add_node('h'+str(s), ip = '10.0.' + str(s) + '.1')
 
     topo["n_switches"] = n_switches
+    outport_mappings = {}
     open_ports = [n_ports] * n_switches 
 
     for sw in range(n_switches):
@@ -40,11 +41,15 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
         i = sw
         while i < n_servers:
             G.add_edge('h'+str(i), curr_switch)
+            outport_mappings[(curr_switch, 'h'+str(i))] = open_ports[sw]
+            print "adding host->switch " + str(('h'+str(i), curr_switch))
+            outport_mappings[('h'+str(i), curr_switch)] = 1
             i += n_switches
             open_ports[sw] -= 1
 
     start_open_ports = copy.deepcopy(open_ports)
     
+    topo['outport_mappings'] = outport_mappings
     # randomly link the remaining open ports
     links = defaultdict(list)
     while sum(open_ports) > 1:
@@ -56,8 +61,14 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
                 x = 's'+str(random.choice(other_switches))
                 y = random.choice(list(nx.all_neighbors(G, x)))
                 G.remove_edge(x, y)
+                x_port = outport_mappings.pop(('s'+str(x), 's'+str(y)))
+                y_port = outport_mappings.pop(('s'+str(y), 's'+str(x)))
                 G.add_edge(x, 's'+str(curr))
                 G.add_edge(y, 's'+str(curr))
+                outport_mappings[(x, 's'+str(curr))] = x_port
+                outport_mappings[('s'+str(curr), x)] = open_ports[curr]
+                outport_mappings[(y, 's'+str(curr))] = y_port
+                outport_mappings[('s'+str(curr), y)] = open_ports[curr] - 1
                 open_ports[curr] -= 2
                 continue
 
@@ -87,6 +98,8 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
         open_ports[x] -= 1
         open_ports[y] -= 1
         G.add_edge('s'+str(x), 's'+str(y))
+        outport_mappings[('s'+str(x), 's'+str(y))] = open_ports[x] + 1
+        outport_mappings[('s'+str(y), 's'+str(x))] = open_ports[y] + 1
 
     sys.stdout.write(" done\n")
     return topo

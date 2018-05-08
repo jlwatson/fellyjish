@@ -1,5 +1,4 @@
 *.pyc
-*.pickle
 .env/
 *.log
 *.eps
