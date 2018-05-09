@@ -62,7 +62,7 @@ class JellyFishTop(Topo):
 
             port1 = outport_mappings[(f1_graph, f2_graph)]
             port2 = outport_mappings[(f2_graph, f1_graph)]
-            self.addLink(f1, f2, bw=10, port1=port1, port2=port2, use_htb=True)
+            self.addLink(f1, f2, bw=5, port1=port1, port2=port2, use_htb=True)
 
         self.topo = topo
 
@@ -97,11 +97,11 @@ def experiment(net, topo, nflows):
         host_b = net.getNodeByName(pair[1])
 
 
-        host_a.sendCmd("iperf", "-s", "-t", "20")
+        host_a.sendCmd("iperf", "-s", "-t", "10")
         if nflows > 1:
-            host_b.sendCmd("iperf", "-c", "10.0."+ pair[0][1:] +".1", "-t", "20", "-P", str(nflows))
+            host_b.sendCmd("iperf", "-c", "10.0."+ pair[0][1:] +".1", "-t", "10", "-P", str(nflows))
         else:
-            host_b.sendCmd("iperf", "-c", "10.0."+ pair[0][1:] +".1", "-t")
+            host_b.sendCmd("iperf", "-c", "10.0."+ pair[0][1:] +".1", "-t", "10")
 
         output = host_b.waitOutput()
         experiment_output.append(output)

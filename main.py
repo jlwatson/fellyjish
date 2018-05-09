@@ -192,7 +192,7 @@ def run_table_test(cwd, topology, algo, flows):
     return output
 
 
-HOST_LINK_BW = 10.0
+HOST_LINK_BW = 5.0
 
 def parse_one_flow_output(result):
     out = result["output"]
@@ -278,7 +278,7 @@ if __name__ == "__main__":
     ##### TABLE 1 #####
 
     print "\nGenerating Table 1\n=================="
-    print "(will take quite a while)\n"
+    print "(will take quite a while, using %d Mb links)\n" % (HOST_LINK_BW)
     test_topo = generate_topology(n_servers=args.servers, n_switches=args.switches, n_ports=args.ports, debug=args.debug)
     topo_path = os.path.join(cwd, args.pickle)
     if args.pickle:
