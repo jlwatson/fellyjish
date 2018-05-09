@@ -11,8 +11,6 @@ from pox.lib.addresses import IPAddr
 
 log = core.getLogger()
 paths = {}
-algo = 'kshort'
-num_paths = 8
 switches_by_dpid = {}
 
 def ipinfo (ip):
@@ -39,12 +37,14 @@ def ecmp(G, start, end, k):
 
 class TopoSwitch (object):
 
-  def __init__ (self, connection, dpid, t):
+  def __init__ (self, connection, dpid, t, algo):
     self.connection = connection
     self.name = 's' + str(int(dpid))
     self.graph_name = 's' + str(int(dpid) - 1)
 
     self.TOPO = t
+    self.algo = algo
+    self.num_paths = 8
 
     connection.addListeners(self)
 
@@ -52,12 +52,12 @@ class TopoSwitch (object):
   def _get_paths(self, src, dst):
     if (src, dst) in paths:
       return paths[(src, dst)]
-    if algo == 'ecmp':
+    if self.algo == 'ecmp':
       fn = ecmp
     else:
       fn = k_shortest_paths
 
-    p_paths = fn(self.TOPO['graph'], src, dst, num_paths)
+    p_paths = fn(self.TOPO['graph'], src, dst, self.num_paths)
     paths[(src, dst)] = p_paths
     return p_paths
 
@@ -165,15 +165,17 @@ class TopoSwitch (object):
         self.act_like_switch(packet, packet_in, event, srchost, dsthost, ipv4.id)
 
 
-def launch(p):
+def launch(p, algo):
 
-  log.info(p)
+  log.info("pickle path: " + p)
   t = pickle.load(open(p, 'r'))
+
+  log.info("routing algorithm used: " + algo)
 
   def start_switch (event):
     log.info("Controlling %s" % (event.connection,))
     log.info("DPID is "  + str(event.dpid))
-    TopoSwitch(event.connection, event.dpid, t)
+    TopoSwitch(event.connection, event.dpid, t, algo)
 
   core.openflow.addListenerByName("ConnectionUp", start_switch)
 

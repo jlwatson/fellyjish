@@ -1,7 +1,10 @@
 import argparse
 import os
-import sys
+import pickle
 import random
+import sys
+from time import sleep, time
+
 from collections import defaultdict
 from mininet.topo import Topo
 from mininet.net import Mininet
@@ -11,14 +14,10 @@ from mininet.node import OVSController
 from mininet.node import Controller
 from mininet.node import RemoteController
 from mininet.cli import CLI
+# from mininet.util import dumpNodeConnections, dumpNetConnections
+
 sys.path.append("../../")
 from pox.ext.jelly_pox import JELLYPOX
-from subprocess import Popen
-from time import sleep, time
-
-from mininet.util import dumpNodeConnections, dumpNetConnections
-
-import pickle
 
 
 def mac_from_value(v):
@@ -30,14 +29,14 @@ class JellyFishTop(Topo):
     def build(self, pkl):
         topo = pickle.load(open(pkl, 'r'))
         outport_mappings = topo['outport_mappings']
-        print outport_mappings
+        # print outport_mappings
         self.mn_hosts = []
         for h in range(topo['n_hosts']):
             hosts_from_graph = topo['graph'].nodes(data='ip')
             for host in hosts_from_graph:
                 if host[0] == 'h' + str(h):
                     break
-            print host
+            # print host
             self.mn_hosts.append(self.addHost('h' + str(h), ip=host[1]))
 
         self.mn_switches = []
@@ -69,7 +68,7 @@ class JellyFishTop(Topo):
                 bw = 20
             else:
                 bw = 10
-            print f1, f2
+            # print f1, f2
             self.addLink(f1, f2, bw=5, port1=port1, port2=port2, use_htb=True)
 
         self.topo = topo
@@ -92,50 +91,57 @@ def random_permutation(topo):
     return pairings
 
 
-def experiment(net, topo):
-    dumpNetConnections(net)
+def experiment(net, topo, nflows):
+    # dumpNetConnections(net)
     net.start()
     sleep(3)
     net.pingAll()
 
+    experiment_output = []
     perm = random_permutation(topo)
     for pair in perm:
         host_a = net.getNodeByName(pair[0])
         host_b = net.getNodeByName(pair[1])
 
-        print "Host %s -> Host %s" % (pair[0], pair[1])
+        # print "Host %s -> Host %s" % (pair[0], pair[1])
 
         host_a.sendCmd("iperf", "-s", "-t", "20")
         host_b.sendCmd("iperf", "-c", "10.0."+ pair[0][1:] +".1", "-t", "20", "-P", "8")
 
         output = host_b.waitOutput()
-        print output
+        experiment_output.append(output)
+
+    return experiment_output
 
 
-def main(pkl):
+def main(pkl, algo, nflows):
 
     topo = JellyFishTop(pkl)
-    net = Mininet(topo=topo, host=CPULimitedHost, link = TCLink, controller=JELLYPOX("jelly", cargs2=("--p=%s" % pkl)))
+    net = Mininet(topo=topo, host=CPULimitedHost, link = TCLink, controller=JELLYPOX("jelly", cargs2=("--p=%s --algo=%s" % (pkl, algo))))
 
-    # set host MAC addresses
     host_mac_base = len(topo.mn_switches)
     for i, h in enumerate(topo.mn_hosts):
         mn_host = net.getNodeByName(h)
-        print h, mac_from_value(host_mac_base + i + 1)
+        # print h, mac_from_value(host_mac_base + i + 1)
         mn_host.setMAC(mac_from_value(host_mac_base + i + 1))
         for j, h2 in enumerate(topo.mn_hosts):
             if i == j: continue
             mn_host2 = net.getNodeByName(h2)
-            print "Setting arp for host " + str(h) + ", index " + str(i) + ". j " + str(j) + ", mac is " + mac_from_value(host_mac_base + j + 1)
+            # print "Setting arp for host " + str(h) + ", index " + str(i) + ". j " + str(j) + ", mac is " + mac_from_value(host_mac_base + j + 1)
             mn_host.setARP('10.0.' + str(j) + '.1', mac_from_value(host_mac_base + j + 1))
 
-    experiment(net, topo)
+    return experiment(net, topo, nflows)
+
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run Jellyfish topology.")
     parser.add_argument('--pickle', help='Topology pickle input path', default=None)
+    parser.add_argument('--algo', help='Path algorithm', default='kshort', choices=['kshort', 'ecmp'])
+    parser.add_argument('--nflows', help='Number of flows between two servers', choices=['1', '8'], default='1')
     args = parser.parse_args()
 
-    main(args.pickle)
+    out = main(args.pickle, args.algo, args.nflows)
+    for cmd in out:
+        print cmd.split("\r\n")
 
