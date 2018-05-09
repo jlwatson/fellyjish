@@ -103,28 +103,3 @@ def generate_topology(n_servers, n_switches, n_ports, debug=False):
     sys.stdout.write(" done\n")
     return topo
 
-
-'''
-# TODO: move somewhere else
-class JellyFishTop(Topo):
-
-    def __init__(self, topo_map):
-        self.topo_map = topo_map
-
-    def build(self):
-        topo_map = self.topo_map
-        mn_hosts = []
-        for h in topo_map["hosts"]:
-            mn_hosts.append(self.addHost(h))
-
-        mn_switches = []
-        for i, s in enumerate(topo_map["switches"]):
-            switch = self.addSwitch(s)
-            mn_switches.append(switch)
-            if i < len(topo_map["hosts"]):
-                self.addLink(mn_hosts[i], switch)
-
-        for p in topo_map["link_pairs"]:
-            self.addLink(mn_switches[p[0]], mn_switches[p[1]])
-'''
-

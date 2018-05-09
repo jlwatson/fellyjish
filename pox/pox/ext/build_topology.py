@@ -29,14 +29,12 @@ class JellyFishTop(Topo):
     def build(self, pkl):
         topo = pickle.load(open(pkl, 'r'))
         outport_mappings = topo['outport_mappings']
-        # print outport_mappings
         self.mn_hosts = []
         for h in range(topo['n_hosts']):
             hosts_from_graph = topo['graph'].nodes(data='ip')
             for host in hosts_from_graph:
                 if host[0] == 'h' + str(h):
                     break
-            # print host
             self.mn_hosts.append(self.addHost('h' + str(h), ip=host[1]))
 
         self.mn_switches = []
@@ -64,12 +62,7 @@ class JellyFishTop(Topo):
 
             port1 = outport_mappings[(f1_graph, f2_graph)]
             port2 = outport_mappings[(f2_graph, f1_graph)]
-            if switch1 and switch2:
-                bw = 20
-            else:
-                bw = 10
-            # print f1, f2
-            self.addLink(f1, f2, bw=5, port1=port1, port2=port2, use_htb=True)
+            self.addLink(f1, f2, bw=10, port1=port1, port2=port2, use_htb=True)
 
         self.topo = topo
 
@@ -95,7 +88,7 @@ def experiment(net, topo, nflows):
     # dumpNetConnections(net)
     net.start()
     sleep(3)
-    net.pingAll()
+    # net.pingAll()
 
     experiment_output = []
     perm = random_permutation(topo)
@@ -103,10 +96,12 @@ def experiment(net, topo, nflows):
         host_a = net.getNodeByName(pair[0])
         host_b = net.getNodeByName(pair[1])
 
-        # print "Host %s -> Host %s" % (pair[0], pair[1])
 
         host_a.sendCmd("iperf", "-s", "-t", "20")
-        host_b.sendCmd("iperf", "-c", "10.0."+ pair[0][1:] +".1", "-t", "20", "-P", "8")
+        if nflows > 1:
+            host_b.sendCmd("iperf", "-c", "10.0."+ pair[0][1:] +".1", "-t", "20", "-P", str(nflows))
+        else:
+            host_b.sendCmd("iperf", "-c", "10.0."+ pair[0][1:] +".1", "-t")
 
         output = host_b.waitOutput()
         experiment_output.append(output)
@@ -114,7 +109,7 @@ def experiment(net, topo, nflows):
     return experiment_output
 
 
-def main(pkl, algo, nflows):
+def build_and_run(pkl, algo, nflows, out=None):
 
     topo = JellyFishTop(pkl)
     net = Mininet(topo=topo, host=CPULimitedHost, link = TCLink, controller=JELLYPOX("jelly", cargs2=("--p=%s --algo=%s" % (pkl, algo))))
@@ -122,15 +117,22 @@ def main(pkl, algo, nflows):
     host_mac_base = len(topo.mn_switches)
     for i, h in enumerate(topo.mn_hosts):
         mn_host = net.getNodeByName(h)
-        # print h, mac_from_value(host_mac_base + i + 1)
         mn_host.setMAC(mac_from_value(host_mac_base + i + 1))
         for j, h2 in enumerate(topo.mn_hosts):
             if i == j: continue
             mn_host2 = net.getNodeByName(h2)
-            # print "Setting arp for host " + str(h) + ", index " + str(i) + ". j " + str(j) + ", mac is " + mac_from_value(host_mac_base + j + 1)
             mn_host.setARP('10.0.' + str(j) + '.1', mac_from_value(host_mac_base + j + 1))
 
-    return experiment(net, topo, nflows)
+    output = experiment(net, topo, nflows)
+    parsed = { "output": [], "algo": algo, "nflows": nflows }
+    for cmd in output:
+        parsed["output"].append(cmd.split("\r\n"))
+
+    if out:
+        with open(out, 'wb') as f:
+            pickle.dump(parsed, f)
+    else:
+        print parsed
 
 
 if __name__ == "__main__":
@@ -139,9 +141,8 @@ if __name__ == "__main__":
     parser.add_argument('--pickle', help='Topology pickle input path', default=None)
     parser.add_argument('--algo', help='Path algorithm', default='kshort', choices=['kshort', 'ecmp'])
     parser.add_argument('--nflows', help='Number of flows between two servers', choices=['1', '8'], default='1')
+    parser.add_argument('--output', help='Output data pickle path', default=None)
     args = parser.parse_args()
 
-    out = main(args.pickle, args.algo, args.nflows)
-    for cmd in out:
-        print cmd.split("\r\n")
+    build_and_run(args.pickle, args.algo, args.nflows, args.output)
 
