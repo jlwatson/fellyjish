@@ -278,7 +278,7 @@ if __name__ == "__main__":
     ##### TABLE 1 #####
 
     print "\nGenerating Table 1\n=================="
-    print "(will take quite a while, using %d Mb links)\n" % (HOST_LINK_BW)
+    print "will take quite a while; using %d Mb links\n" % (HOST_LINK_BW)
     test_topo = generate_topology(n_servers=args.servers, n_switches=args.switches, n_ports=args.ports, debug=args.debug)
     topo_path = os.path.join(cwd, args.pickle)
     if args.pickle:
